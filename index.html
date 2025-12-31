@@ -195,7 +195,7 @@
             transition: color 0.3s;
         }
 
-        /* Skill Button - Made larger for touch */
+        /* Skill Button (Left) */
         #skillButton {
             position: absolute;
             bottom: 20%;
@@ -238,6 +238,38 @@
         #skillButton.ready svg { fill: #ffcc00; }
         #skillButton.active svg { fill: #000; }
 
+        /* Jump Button (Right) - NEW */
+        #jumpButton {
+            position: absolute;
+            bottom: 20%;
+            right: 5%;
+            width: clamp(60px, 15vw, 90px);
+            height: clamp(60px, 15vw, 90px);
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            border: 3px solid #444;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #jumpButton:active {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(0.95);
+            border-color: #fff;
+        }
+
+        #jumpButton svg {
+            fill: #fff;
+            width: 50%;
+            height: 50%;
+        }
+
         .controls-hint {
             position: absolute;
             bottom: 3%;
@@ -277,14 +309,21 @@
         </div>
         <div id="energyText">CHARGING...</div>
 
+        <!-- Skill Button (Left) -->
         <div id="skillButton" onmousedown="handleSkillClick(event)" ontouchstart="handleSkillClick(event)">
-            <!-- Bolt Icon -->
             <svg viewBox="0 0 24 24">
                 <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
             </svg>
         </div>
+
+        <!-- Jump Button (Right) -->
+        <div id="jumpButton" onmousedown="handleJumpClick(event)" ontouchstart="handleJumpClick(event)">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 4l-8 8h6v8h4v-8h6z"/>
+            </svg>
+        </div>
         
-        <div class="controls-hint">TAP to Jump &middot; TAP BOLT for Overdrive</div>
+        <div class="controls-hint">TAP ARROW or SPACE to Jump &middot; TAP BOLT for Overdrive</div>
     </div>
 
     <!-- Start Screen -->
@@ -298,7 +337,7 @@
             <div class="stats-value" id="menuHighScore">0</div>
         </div>
 
-        <p>Space/Klik to Jump <br>Shift/Klik Button to Overdrive</p>
+        <p>Space/Klik Button to Jump <br>Shift/Klik Bolt to Overdrive</p>
         <button onclick="startGame()">START RUN</button>
     </div>
 
@@ -319,8 +358,6 @@
     const ctx = canvas.getContext('2d');
     const container = document.getElementById('gameContainer');
 
-    // Internal resolution (game logic always thinks it's this size)
-    // The CSS scales this up to fit the screen visually.
     const GAME_WIDTH = 800;
     const GAME_HEIGHT = 400;
     canvas.width = GAME_WIDTH;
@@ -334,28 +371,17 @@
         initialized: false
     };
 
-    // Configure Audio Settings
     audio.bgm.loop = true;
-    audio.bgm.volume = 0.3; // 30%
-
-    // Browsers cap volume at 1.0. 
-    // "150%" requested means max volume, likely pre-amplified or just max.
+    audio.bgm.volume = 0.3;
     audio.jump.volume = 1.0; 
-    
-    // "130%" requested, capped at 1.0
     audio.overdrive.volume = 1.0; 
     audio.overdrive.loop = true;
 
-    // Function to play sound safely
     function playSound(name) {
         if (!audio.initialized) return;
-        
         const s = audio[name];
         if (s) {
-            // If it's a one-shot sound like jump, reset it so it can play rapidly
-            if (name === 'jump') {
-                s.currentTime = 0;
-            }
+            if (name === 'jump') s.currentTime = 0;
             s.play().catch(e => console.log("Audio play failed: ", e));
         }
     }
@@ -368,12 +394,9 @@
         }
     }
 
-    // Initialize Audio Context on first user interaction
     function initAudio() {
         if (audio.initialized) return;
         audio.initialized = true;
-        // Resume context if needed or just prepare sounds
-        // Attempt to play and immediately pause to unlock audio on mobile
         audio.jump.play().then(() => {
             audio.jump.pause();
             audio.jump.currentTime = 0;
@@ -394,7 +417,6 @@
         gameTime: 0
     };
 
-    // Load High Score safely
     try {
         const savedScore = localStorage.getItem('cyberLeapHigh');
         state.highScore = savedScore ? parseFloat(savedScore) : 0;
@@ -406,16 +428,9 @@
     document.getElementById('menuHighScore').innerText = Math.floor(state.highScore);
 
     const player = {
-        x: 100,
-        y: 200,
-        w: 30,
-        h: 30,
-        vy: 0,
-        grounded: false,
-        jumpCount: 0,
-        color: '#00ff88',
-        rotation: 0,
-        rotVelocity: 0
+        x: 100, y: 200, w: 30, h: 30, vy: 0,
+        grounded: false, jumpCount: 0, color: '#00ff88',
+        rotation: 0, rotVelocity: 0
     };
 
     let obstacles = [];
@@ -426,7 +441,7 @@
 
     // --- Input ---
     function jump() {
-        initAudio(); // Try to init audio on jump input
+        initAudio(); 
         if (!state.running) return;
         if (state.dashing) return;
 
@@ -445,27 +460,21 @@
             player.rotVelocity = 25; 
             createExplosion(player.x + player.w/2, player.y + player.h, 8, '#00ff88');
             playSound('jump');
-            
-            // "Freestyle" score bonus
             state.score += 10;
             createFloatingText("+10", player.x, player.y - 20);
         }
     }
 
     function toggleSkill() {
-        initAudio(); // Ensure audio is ready
+        initAudio();
         if (!state.running) return;
 
         if (state.dashing) {
-            // Deactivate
             state.dashing = false;
             player.rotVelocity = 0;
-            player.rotation = 0; // Snap back for safety
+            player.rotation = 0; 
             stopSound('overdrive');
-            // Resume BGM volume or normal state if weducked it? 
-            // Currently overdrive just plays over BGM
         } else {
-            // Activate
             if (state.energy >= 20) {
                 state.dashing = true;
                 state.shake = 5;
@@ -476,11 +485,17 @@
         updateEnergyUI();
     }
 
-    // Explicit handler for skill button to prevent event bubbling triggering a jump
+    // Button Handlers
     function handleSkillClick(e) {
         e.preventDefault();
-        e.stopPropagation(); // Stop it from reaching window listeners
+        e.stopPropagation(); 
         toggleSkill();
+    }
+
+    function handleJumpClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        jump();
     }
 
     // Keyboard Controls
@@ -494,18 +509,17 @@
         }
     });
 
-    // Touch/Mouse Controls (Global for Jump)
+    // Touch/Mouse Controls (Background Click)
     window.addEventListener('mousedown', (e) => {
-        // Ignore if clicking a button or the skill button
-        if(e.target.closest('button') || e.target.closest('#skillButton')) return;
+        // Ignore if clicking a button (skill or jump)
+        if(e.target.closest('button') || e.target.closest('#skillButton') || e.target.closest('#jumpButton')) return;
         e.preventDefault();
         jump();
     });
     
     window.addEventListener('touchstart', (e) => {
-        // Ignore if touching a button or the skill button
-        if(e.target.closest('button') || e.target.closest('#skillButton')) return;
-        e.preventDefault(); // Prevent scroll/zoom
+        if(e.target.closest('button') || e.target.closest('#skillButton') || e.target.closest('#jumpButton')) return;
+        e.preventDefault(); 
         jump();
     }, {passive: false});
 
@@ -546,7 +560,6 @@
         player.jumpCount = 0;
         player.grounded = false;
 
-        // Start BGM
         playSound('bgm');
 
         updateEnergyUI();
@@ -560,17 +573,13 @@
         document.getElementById('gameOverScreen').classList.add('hidden');
         document.getElementById('startScreen').classList.remove('hidden');
         document.getElementById('menuHighScore').innerText = Math.floor(state.highScore);
-        
-        // Reset a bit of background for visual effect
         state.running = false;
-        draw(); // Draw static frame
+        draw(); 
     }
 
     function gameOver() {
         state.running = false;
         state.shake = 15;
-        
-        // Stop Audio
         stopSound('bgm');
         stopSound('overdrive');
 
@@ -603,20 +612,13 @@
     function update() {
         state.frames++;
         state.gameTime++;
-        
-        // Difficulty Ramp
         if (state.frames % 500 === 0) state.speed += 0.5;
-        
-        // Score Calculation
         state.score += (state.speed / 50);
         document.getElementById('scoreVal').innerText = Math.floor(state.score);
-        
         if(state.shake > 0) state.shake *= 0.9;
 
-        // Background Color Shift based on time
         bgGradientPhase = (state.gameTime / 2000) % 1;
 
-        // --- Energy Logic ---
         if (state.dashing) {
             state.energy -= 0.4;
             if (state.energy <= 0) {
@@ -626,37 +628,27 @@
                 player.rotation = 0;
                 stopSound('overdrive');
             }
-            // Overdrive Physics
             player.vy = 0;
-            const targetY = GAME_HEIGHT / 2;
-            // Smooth lerp
-            player.y += (targetY - player.y) * 0.08;
+            player.y += (GAME_HEIGHT / 2 - player.y) * 0.08;
             player.rotation += 25; 
-            
-            // Add trail
             if (state.frames % 4 === 0) {
                 createExplosion(player.x, player.y + player.h/2, 1, '#ffcc00');
             }
         } else {
-            // Recharge
             if (state.energy < 100) {
                 state.energy += 0.1;
                 if (state.energy > 100) state.energy = 100;
             }
-            
-            // Gravity
             player.vy += 0.6;
             player.y += player.vy;
             player.rotation += player.rotVelocity;
 
-            // Floor Collision
             const floorY = GAME_HEIGHT - 50;
             if (player.y + player.h > floorY) {
                 player.y = floorY - player.h;
                 player.vy = 0;
                 player.grounded = true;
                 player.jumpCount = 0;
-                
                 if (Math.abs(player.rotVelocity) > 5) {
                     createExplosion(player.x + player.w/2, player.y + player.h, 5, '#fff');
                 }
@@ -668,7 +660,6 @@
         }
         updateEnergyUI();
 
-        // --- Obstacles ---
         let spawnThreshold = Math.floor(1100 / state.speed); 
         if (spawnThreshold < 50) spawnThreshold = 50;
 
@@ -689,35 +680,29 @@
                 ob.rotation += 15;
             }
 
-            // Collision
             const px = player.x + 5;
             const py = player.y + 5;
             const pw = player.w - 10;
             const ph = player.h - 10;
-
             let collision = false;
 
-            // Simple Box Check
             if (px < ob.x + ob.w && px + pw > ob.x && py < ob.y + ob.h && py + ph > ob.y) {
                 collision = true;
             }
 
-            // Saw Precise Check
             if (ob.type === 'saw') {
-                collision = false; // Reset to do circle check
+                collision = false; 
                 const cx = ob.x + ob.w/2;
                 const cy = ob.y + ob.h/2;
                 const r = ob.w/2 - 5;
                 const pcx = player.x + player.w/2;
                 const pcy = player.y + player.h/2;
-                // Simple distance check against player center
                 const dist = Math.sqrt((cx-pcx)**2 + (cy-pcy)**2);
                 if (dist < r + player.w/2) collision = true;
             }
 
             if (collision) {
                 if (state.dashing) {
-                    // Smash
                     createExplosion(ob.x + ob.w/2, ob.y + ob.h/2, 12, '#ffcc00');
                     obstacles.splice(i, 1);
                     state.shake = 5;
@@ -725,10 +710,8 @@
                     createFloatingText("SMASH!", player.x, player.y - 30);
                     continue;
                 } else {
-                    // Platform Logic
                     if (ob.type === 'platform') {
                         const playerBottom = player.y + player.h;
-                        // Land on top if falling and near top edge
                         if (playerBottom >= ob.y && playerBottom <= ob.y + 30 && player.vy >= 0) {
                             player.y = ob.y - player.h;
                             player.vy = 0;
@@ -748,7 +731,6 @@
             if (ob.x + ob.w < -100) obstacles.splice(i, 1);
         }
 
-        // Particles
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
             p.x += p.vx;
@@ -805,25 +787,18 @@
     }
 
     function draw() {
-        // Dynamic Background
-        // Shift hue slightly over time
         let hueShift = Math.floor(bgGradientPhase * 60); 
-        let baseColor = `hsl(${240 + hueShift}, 40%, 10%)`;
-        let midColor = `hsl(${260 + hueShift}, 40%, 20%)`;
-        
         let grad = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-        grad.addColorStop(0, baseColor);
-        grad.addColorStop(1, midColor);
+        grad.addColorStop(0, `hsl(${240 + hueShift}, 40%, 10%)`);
+        grad.addColorStop(1, `hsl(${260 + hueShift}, 40%, 20%)`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-        // Shake
         ctx.save();
         if (state.shake > 0) {
             ctx.translate((Math.random()-0.5)*state.shake, (Math.random()-0.5)*state.shake);
         }
 
-        // Stars
         ctx.fillStyle = '#ffffff';
         bgStars.forEach(star => {
             star.x -= star.speed * (state.dashing ? state.speed : state.speed/3);
@@ -833,12 +808,10 @@
         });
         ctx.globalAlpha = 1.0;
 
-        // Floor
         const floorY = GAME_HEIGHT - 50;
         ctx.fillStyle = '#0f3460';
         ctx.fillRect(0, floorY, GAME_WIDTH, 50);
         
-        // Grid
         ctx.strokeStyle = '#e94560';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -851,7 +824,6 @@
         }
         ctx.stroke();
 
-        // Obstacles
         obstacles.forEach(ob => {
             ctx.shadowBlur = 0;
             if (ob.type === 'spike') {
@@ -897,7 +869,6 @@
             }
         });
 
-        // Player
         ctx.save();
         ctx.translate(player.x + player.w/2, player.y + player.h/2);
         ctx.rotate(player.rotation * Math.PI / 180);
@@ -910,7 +881,6 @@
         ctx.fillStyle = pColor;
         ctx.fillRect(-player.w/2, -player.h/2, player.w, player.h);
         
-        // Overdrive Shield Effect
         if (state.dashing) {
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
@@ -925,7 +895,6 @@
         
         ctx.restore();
 
-        // Particles & Text
         particles.forEach(p => {
             if (p.text) {
                 ctx.fillStyle = "#fff";
@@ -942,7 +911,6 @@
             }
         });
 
-        // Speed Lines
         if (state.dashing) {
             ctx.strokeStyle = 'rgba(255, 204, 0, 0.3)';
             ctx.lineWidth = 2;
@@ -1015,5 +983,4 @@
 
 </script>
 </body>
-
 </html>

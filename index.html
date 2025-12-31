@@ -543,7 +543,7 @@
         initAudio();
         state.running = true;
         state.score = 0;
-        state.speed = 7;
+        state.speed = 10;
         state.frames = 0;
         state.gameTime = 0;
         state.shake = 0;
@@ -612,7 +612,7 @@
     function update() {
         state.frames++;
         state.gameTime++;
-        if (state.frames % 500 === 0) state.speed += 0.5;
+        if (state.frames % 200 === 0) state.speed += 1;
         state.score += (state.speed / 50);
         document.getElementById('scoreVal').innerText = Math.floor(state.score);
         if(state.shake > 0) state.shake *= 0.9;
@@ -984,4 +984,5 @@
 </script>
 </body>
 </html>
+
 
